@@ -7,7 +7,7 @@ int thread_count;
 /*Simple function to iteratively increment a shared integer 5 times*/
 void *increment(void *num) {
     int *val = (int *)num;
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 5; i++) {
         *val += 1;
     }
     return NULL;
