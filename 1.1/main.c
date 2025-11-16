@@ -4,5 +4,6 @@
 int main() {
     printf("Starting main\n");
 
+    printf("Shutting down main\n");
     return 0;
 }
