@@ -23,6 +23,7 @@ void *increment(void *arg) {
 
     pthread_mutex_unlock(&mutex);
 
+    val = NULL;
     return NULL;
 }
 
@@ -38,11 +39,8 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&mutex, NULL); // Initializing mutex
     long index = 0;                   // Index assigned to each thread for differentiation, initialized as 0
 
-    // Receiving number of threads from command line
-    thread_count = strtol(argv[1], NULL, 10);
-
-    // Allocating memory for thread data
-    thread_handle = malloc(thread_count * sizeof(pthread_t));
+    thread_count = strtol(argv[1], NULL, 10);                 // Receiving number of threads from command line
+    thread_handle = malloc(thread_count * sizeof(pthread_t)); // Allocating memory for thread data
 
     // Creating threads
     for (index = 0; index < thread_count; index++) {
@@ -61,9 +59,8 @@ int main(int argc, char *argv[]) {
     thread_handle = NULL;
     pthread_mutex_destroy(&mutex);
 
-    // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
-    printf("----------Shutting down main----------\n");
+    printf("----------Shutting down main----------\n\n");
 
     return 0;
 }
