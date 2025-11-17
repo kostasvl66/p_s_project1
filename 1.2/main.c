@@ -13,6 +13,7 @@ void *increment(void *num) {
     return NULL;
 }
 
+/*This implementation results in a non-deterministic value on the "shared" variable*/
 int main(int argc, char *argv[]) {
     printf("------------Starting main-------------\n");
     long thread;
