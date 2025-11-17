@@ -13,8 +13,7 @@ struct arg_struct {
 
 /*Simple function to iteratively increment a shared integer one million times*/
 void *increment(void *arg) {
-    long *val = ((struct arg_struct *)arg)->value_ptr;
-    long my_index = ((struct arg_struct *)arg)->thread_index;
+    long *val = (long *)arg;
 
     pthread_mutex_lock(&mutex);
 
@@ -42,22 +41,12 @@ int main(int argc, char *argv[]) {
     // Receiving number of threads from command line
     thread_count = strtol(argv[1], NULL, 10);
 
-    // Initializing list of arguments to be passed into the thread function
-    struct arg_struct **args = malloc(thread_count * sizeof(struct arg_struct *));
-
-    for (int i = 0; i < thread_count; i++) {
-        args[i] = malloc(sizeof(long *) + sizeof(long));
-    }
-
     // Allocating memory for thread data
     thread_handle = malloc(thread_count * sizeof(pthread_t));
 
     // Creating threads
     for (index = 0; index < thread_count; index++) {
-
-        *args[index] = (struct arg_struct){&shared, index};
-
-        if (pthread_create(&thread_handle[index], NULL, increment, (void *)args[index])) {
+        if (pthread_create(&thread_handle[index], NULL, increment, (void *)&shared)) {
             perror("Error while creating thread");
         }
     }
