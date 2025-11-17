@@ -5,6 +5,7 @@
 int thread_count;
 long flag; // Flag used for busy-waiting implementation
 
+// Structure which allows for parsing multiple arguments into a thread function
 struct arg_struct {
     long *value_ptr;
     long thread_index;
@@ -26,6 +27,7 @@ void *increment(void *arg) {
     return NULL;
 }
 
+/*This implementation results in a deterministic value on the "shared" variable*/
 int main(int argc, char *argv[]) {
     printf("------------Starting main-------------\n");
     pthread_t *thread_handle = NULL;
@@ -36,11 +38,11 @@ int main(int argc, char *argv[]) {
     long flag = 0;     // Initializing flag as 0, so that thread with index 0 begins execution
     long index = flag; // Index assigned to each thread for differentiation, initialized as 0
 
-    // Initializing list of arguments to be passed into the thread function
-    struct arg_struct **args = malloc(4 * sizeof(struct arg_struct *));
-
     // Receiving number of threads from command line
     thread_count = strtol(argv[1], NULL, 10);
+
+    // Initializing list of arguments to be passed into the thread function
+    struct arg_struct **args = malloc(thread_count * sizeof(struct arg_struct *));
 
     for (int i = 0; i < thread_count; i++) {
         args[i] = malloc(sizeof(long *) + sizeof(long));
