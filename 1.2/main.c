@@ -4,10 +4,10 @@
 
 int thread_count;
 
-/*Simple function to iteratively increment a shared integer 5 times*/
+/*Simple function to iteratively increment a shared integer one million times*/
 void *increment(void *num) {
-    int *val = (int *)num;
-    for (int i = 0; i < 5; i++) {
+    long *val = (long *)num;
+    for (long i = 0; i < 1000000; i++) {
         *val += 1;
     }
     return NULL;
@@ -21,23 +21,22 @@ int main(int argc, char *argv[]) {
     // Receiving number of threads from command line
     thread_count = strtol(argv[1], NULL, 10);
 
-    int shared = 0;
-    printf("Starting value of shared variable is: %d\n", shared);
-    int *ptr = &shared;
+    long shared = 0;
+    printf("Starting value of shared variable is: %ld\n", shared);
 
     // Allocating memory for thread data
     thread_handle = malloc(thread_count * sizeof(pthread_t));
 
     // Creating threads
     for (thread = 0; thread < thread_count; thread++) {
-        int res = pthread_create(&thread_handle[thread], NULL, increment, ptr);
+        int res = pthread_create(&thread_handle[thread], NULL, increment, (void *)&shared);
         if (res) {
             printf("pthread_create error: %d \n", res);
             break;
         }
     }
 
-    // Joining all thread after process completion
+    // Joining all threads after process completion
     for (thread = 0; thread < thread_count; thread++) {
         pthread_join(thread_handle[thread], NULL);
     }
@@ -45,10 +44,9 @@ int main(int argc, char *argv[]) {
     // Clearing allocated memory
     free(thread_handle);
     thread_handle = NULL;
-    ptr = NULL;
 
-    // Expected final value is 20, if we have 4 threads incrementing the value 5 times each
-    printf("Final value of variable is: %d\n", shared);
+    // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
+    printf("Final value of variable is: %ld\n", shared);
     printf("----------Shutting down main----------\n");
 
     return 0;
