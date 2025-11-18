@@ -3,12 +3,13 @@
 #include <stdlib.h>
 
 int thread_count;
+long iterations;
 
 /*Simple function to iteratively increment a shared integer one million times*/
 void *increment(void *num) {
     // Pointer to given argument(shared variable) must be initialized as _Atomic Long so that the following operations remain thread-safe
     _Atomic long *val = (_Atomic long *)num;
-    for (long i = 0; i < 1000000; i++) {
+    for (long i = 0; i < iterations; i++) {
         *val += 1;
     }
     return NULL;
@@ -16,12 +17,13 @@ void *increment(void *num) {
 
 /*This implementation results in a non-deterministic value on the "shared" variable*/
 int main(int argc, char *argv[]) {
-    printf("------------Starting main-------------\n");
+    printf("------------Starting atomic-------------\n");
     long thread;
     pthread_t *thread_handle = NULL;
 
     // Receiving number of threads from command line
     thread_count = strtol(argv[1], NULL, 10);
+    iterations = strtol(argv[2], NULL, 10);
 
     // Initializing shared variable as an Atomic Long so that it's used in a thread-safe manner
     _Atomic long shared = 0;
@@ -50,7 +52,7 @@ int main(int argc, char *argv[]) {
 
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
-    printf("----------Shutting down main----------\n");
+    printf("----------Shutting down atomic----------\n\n");
 
     return 0;
 }

@@ -30,7 +30,7 @@ void *increment(void *arg) {
 /*This implementation results in a deterministic value on the "shared" variable*/
 /*A simple mutex lock is used to ensure conflicts are avoided*/
 int main(int argc, char *argv[]) {
-    printf("------------Starting main-------------\n");
+    printf("------------Starting mutex-------------\n");
     pthread_t *thread_handle = NULL;
 
     long shared = 0; // Shared variable to be incremented by the thread function
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_destroy(&mutex);
 
     printf("Final value of variable is: %ld\n", shared);
-    printf("----------Shutting down main----------\n\n");
+    printf("----------Shutting down mutex----------\n\n");
 
     return 0;
 }

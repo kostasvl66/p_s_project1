@@ -18,7 +18,7 @@ void *increment(void *num) {
 
 /*This implementation results in a non-deterministic value on the "shared" variable*/
 int main(int argc, char *argv[]) {
-    printf("------------Starting main-------------\n");
+    printf("------------Starting rw-------------\n");
     long thread;
     pthread_t *thread_handle = NULL;
 
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
 
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
-    printf("----------Shutting down main----------\n");
+    printf("----------Shutting down rw----------\n\n");
 
     return 0;
 }

@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
-    printf("----------Shutting down main----------\n");
+    printf("----------Shutting down main----------\n\n");
 
     return 0;
 }
