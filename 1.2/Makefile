@@ -2,7 +2,10 @@ CFLAGS = -g -Wall -lpthread
 T = 4
 R = 1000000
 
+PROG = main
+
 .SILENT:
+
 run-all: run-main run-mutex run-rw run-atomic
 
 all: main mutex rw atomic
