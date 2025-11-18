@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
 {   
     if (parse_args(argc, argv) == -1) return 1;
 
+    // for now just trying the sum
+
     int *coef_arr1 = malloc((N + 1) * sizeof(int));
     if (!coef_arr1) return 1;
     for (int i = 0; i <= N; i++)
