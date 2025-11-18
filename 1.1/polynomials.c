@@ -69,21 +69,53 @@ void pol_print(Polynomial *pol)
     }
 }
 
+// returns the sum of two polynomials; its memory is to be freed using pol_destroy; returns NULL if unsuccessful
+Polynomial *pol_add(Polynomial *pol1, Polynomial *pol2)
+{
+    Polynomial *res = malloc(sizeof(Polynomial));
+    if (!res) return NULL;
+
+    // new degree is the largest of the two
+    res->degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
+    res->coef_arr = malloc((res->degree + 1) * sizeof(int));
+    if (!(res->coef_arr)) return NULL;
+
+    long min_degree = (pol1->degree < pol2->degree) ? pol1->degree : pol2->degree; // smallest of the two degrees
+    for (int i = 0; i <= min_degree; i++)
+        res->coef_arr[i] = pol1->coef_arr[i] + pol2->coef_arr[i];
+
+    Polynomial *max_pol = (pol1->degree > pol2->degree) ? pol1 : pol2; // polynomial with the largest degree
+    for (int i = min_degree + 1; i <= res->degree; i++)
+        res->coef_arr[i] = max_pol->coef_arr[i];
+
+    return res;
+}
+
 int main(int argc, char *argv[])
 {   
     if (parse_args(argc, argv) == -1) return 1;
 
-    int *coef_arr = malloc((N + 1) * sizeof(int));
-    if (!coef_arr) return 1;
+    int *coef_arr1 = malloc((N + 1) * sizeof(int));
+    if (!coef_arr1) return 1;
     for (int i = 0; i <= N; i++)
-        coef_arr[i] = 5;
+        coef_arr1[i] = 5;
+    Polynomial *pol1;
+    if (pol_init(&pol1, coef_arr1, N) == -1) return 1;
+    pol_print(pol1);
 
-    Polynomial *pol;
-    if (pol_init(&pol, coef_arr, N) == -1) return 1;
+    int *coef_arr2 = malloc((THREAD_COUNT + 1) * sizeof(int));
+    if (!coef_arr2) return 1;
+    for (int i = 0; i <= THREAD_COUNT; i++)
+        coef_arr2[i] = 3;
+    Polynomial *pol2;
+    if (pol_init(&pol2, coef_arr2, THREAD_COUNT) == -1) return 1;
+    pol_print(pol2);
 
-    pol_print(pol);
+    Polynomial *sum = pol_add(pol1, pol2);
+    pol_print(sum);
 
-    pol_destroy(&pol);
+    pol_destroy(&pol1);
+    pol_destroy(&pol2);
 
     return 0;
 }
