@@ -73,7 +73,8 @@ int main(int argc, char *argv[])
 {   
     if (parse_args(argc, argv) == -1) return 1;
 
-    int *coef_arr = malloc(N * sizeof(int));
+    int *coef_arr = malloc((N + 1) * sizeof(int));
+    if (!coef_arr) return 1;
     for (int i = 0; i <= N; i++)
         coef_arr[i] = 5;
 
