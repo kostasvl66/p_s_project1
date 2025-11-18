@@ -37,11 +37,15 @@ typedef struct {
 } Polynomial;
 
 // initializes a polynomial; returns 0 on success, -1 otherwise
-// coef_arr must be heap allocated and is now owned by pol_init; that array is to be freed only by pol_destroy
+// coef_arr must be heap allocated and is now owned by pol_init; that array is to be freed by pol_destroy (or pol_init)
 int pol_init(Polynomial **out_pol, int *coef_arr, long degree)
 {
     *out_pol = malloc(sizeof(Polynomial));
-    if (!(*out_pol)) return -1;
+    if (!(*out_pol))
+    {
+        free(coef_arr); // if malloc fails coef_arr must be freed as it is now owned by pol_init
+        return -1;
+    } 
 
     (*out_pol)->coef_arr = coef_arr; // assuming the coef_arr passed remains intact
     (*out_pol)->degree = degree;
@@ -78,7 +82,11 @@ Polynomial *pol_add(Polynomial *pol1, Polynomial *pol2)
     // new degree is the largest of the two
     res->degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
     res->coef_arr = malloc((res->degree + 1) * sizeof(int));
-    if (!(res->coef_arr)) return NULL;
+    if (!(res->coef_arr))
+    {
+        free(res);
+        return NULL;
+    } 
 
     long min_degree = (pol1->degree < pol2->degree) ? pol1->degree : pol2->degree; // smallest of the two degrees
     for (int i = 0; i <= min_degree; i++)
@@ -112,6 +120,7 @@ int main(int argc, char *argv[])
     pol_print(pol2);
 
     Polynomial *sum = pol_add(pol1, pol2);
+    if (!sum) return 1;
     pol_print(sum);
 
     pol_destroy(&pol1);
