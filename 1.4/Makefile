@@ -2,7 +2,7 @@ CFLAGS = -g -Wall -lpthread
 
 .SILENT:
 
-run-main: main
+run-main: clean main
 	echo "Running main"
 	./main
 
