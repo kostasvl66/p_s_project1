@@ -16,6 +16,7 @@ void *increment(void *num) {
 }
 
 /*This implementation results in a non-deterministic value on the "shared" variable*/
+// TODO:RETURN LONG LATERRRRRR
 int main(int argc, char *argv[]) {
     printf("------------Starting atomic-------------\n");
     long thread;
