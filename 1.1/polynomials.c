@@ -73,31 +73,66 @@ void pol_print(Polynomial *pol)
     }
 }
 
-// returns the sum of two polynomials; its memory is to be freed using pol_destroy; returns NULL if unsuccessful
-Polynomial *pol_add(Polynomial *pol1, Polynomial *pol2)
+
+// sets every term of a polynomial to zero without changing degree (useful for multiplication)
+void pol_set_zero(Polynomial *pol)
+{
+    for (long i = 0; i <= pol->degree; i++)
+        pol->coef_arr[i] = 0;
+}
+
+// result receives the sum of two polynomials; returns 0 if successful, -1 otherwise
+// result is expected to have allocated large enough coef_arr, and only the terms up to the degree are updated
+void pol_add(Polynomial *pol1, Polynomial *pol2, Polynomial *result)
+{
+    // new degree is the largest of the two
+    result->degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
+
+    long min_degree = (pol1->degree < pol2->degree) ? pol1->degree : pol2->degree; // smallest of the two degrees
+    for (long i = 0; i <= min_degree; i++)
+        result->coef_arr[i] = pol1->coef_arr[i] + pol2->coef_arr[i];
+
+    Polynomial *max_pol = (pol1->degree > pol2->degree) ? pol1 : pol2; // polynomial with the largest degree
+    for (long i = min_degree + 1; i <= result->degree; i++)
+        result->coef_arr[i] = max_pol->coef_arr[i];
+}
+
+/*
+// returns the product of two polynomials; its memory is to be freed using pol_destroy; returns NULL if unsuccessful
+Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
 {
     Polynomial *res = malloc(sizeof(Polynomial));
     if (!res) return NULL;
 
-    // new degree is the largest of the two
-    res->degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
+    // new degree is the sum of the two
+    res->degree = pol1->degree + pol2->degree;
     res->coef_arr = malloc((res->degree + 1) * sizeof(int));
     if (!(res->coef_arr))
     {
         free(res);
         return NULL;
-    } 
+    }
 
-    long min_degree = (pol1->degree < pol2->degree) ? pol1->degree : pol2->degree; // smallest of the two degrees
-    for (int i = 0; i <= min_degree; i++)
-        res->coef_arr[i] = pol1->coef_arr[i] + pol2->coef_arr[i];
+    Polynomial prod_i; // the product of i-th pol1 term and the whole pol2
+    prod_i.degree = 0; // for now
+    prod_i.coef_arr = malloc((res->degree + 1) * sizeof(int)); // pre-allocating the final needed size to avoid allocations in the loop
+    if (!(prod_i.coef_arr))
+    {
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
 
-    Polynomial *max_pol = (pol1->degree > pol2->degree) ? pol1 : pol2; // polynomial with the largest degree
-    for (int i = min_degree + 1; i <= res->degree; i++)
-        res->coef_arr[i] = max_pol->coef_arr[i];
+    for (long i = 0; i <= pol1->degree; i++)
+    {
+        prod_i.degree = pol2->degree + i;
+        pol_set_zero(&prod_i);
+        for (long j = 0; j <= pol2->degree; j++)
+            prod_i.coef_arr[j + i] = pol1->coef_arr[i] * pol2->coef_arr[j];
 
-    return res;
-}
+        
+    }
+}*/
 
 int main(int argc, char *argv[])
 {   
@@ -121,8 +156,13 @@ int main(int argc, char *argv[])
     if (pol_init(&pol2, coef_arr2, THREAD_COUNT) == -1) return 1;
     pol_print(pol2);
 
-    Polynomial *sum = pol_add(pol1, pol2);
-    if (!sum) return 1;
+    Polynomial *sum;
+    long sum_degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
+    int *sum_coef_arr = malloc(sum_degree * sizeof(int));
+    if (!(sum_coef_arr)) return 1;
+    if (pol_init(&sum, sum_coef_arr, sum_degree) == -1) return 1;
+    pol_add(pol1, pol2, sum);
+    
     pol_print(sum);
 
     pol_destroy(&pol1);
