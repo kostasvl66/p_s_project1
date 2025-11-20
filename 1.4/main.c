@@ -6,7 +6,7 @@ int main() {
     int *balance_list = malloc(5 * sizeof(int));
 
     printf("List should be: \n");
-    printf("[\t");
+    printf("[");
     for (int i = 0; i < 5; i++) {
         balance_list[i] = rand();
         printf("\t%d,", balance_list[i]);
