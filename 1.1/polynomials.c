@@ -83,21 +83,25 @@ void pol_set_zero(Polynomial *pol)
 
 // result receives the sum of two polynomials; returns 0 if successful, -1 otherwise
 // result is expected to have allocated large enough coef_arr, and only the terms up to the degree are updated
+// this function works properly even if pol1 or pol2 points to the same memory as result
 void pol_add(Polynomial *pol1, Polynomial *pol2, Polynomial *result)
 {
-    // new degree is the largest of the two
-    result->degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
+    // saving degrees in case pol1 or pol2 points to the same memory as result
+    long degree1 = pol1->degree;
+    long degree2 = pol2->degree;
 
-    long min_degree = (pol1->degree < pol2->degree) ? pol1->degree : pol2->degree; // smallest of the two degrees
+    // new degree is the largest of the two
+    result->degree = (degree1 > degree2) ? degree1 : degree2;
+
+    long min_degree = (degree1 < degree2) ? degree1 : degree2; // smallest of the two degrees
     for (long i = 0; i <= min_degree; i++)
         result->coef_arr[i] = pol1->coef_arr[i] + pol2->coef_arr[i];
 
-    Polynomial *max_pol = (pol1->degree > pol2->degree) ? pol1 : pol2; // polynomial with the largest degree
+    Polynomial *max_pol = (degree1 > degree2) ? pol1 : pol2; // polynomial with the largest degree
     for (long i = min_degree + 1; i <= result->degree; i++)
         result->coef_arr[i] = max_pol->coef_arr[i];
 }
 
-/*
 // returns the product of two polynomials; its memory is to be freed using pol_destroy; returns NULL if unsuccessful
 Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
 {
@@ -126,13 +130,16 @@ Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
     for (long i = 0; i <= pol1->degree; i++)
     {
         prod_i.degree = pol2->degree + i;
-        pol_set_zero(&prod_i);
+        pol_set_zero(&prod_i); // setting zero to overrite terms of power lower than (j + i)
         for (long j = 0; j <= pol2->degree; j++)
-            prod_i.coef_arr[j + i] = pol1->coef_arr[i] * pol2->coef_arr[j];
+            prod_i.coef_arr[j + i] = pol1->coef_arr[i] * pol2->coef_arr[j]; // "shifting" each power by i and multiplying terms
 
-        
+        pol_add(&prod_i, res, res); // adding prod_i to res
     }
-}*/
+
+    free(prod_i.coef_arr);
+    return res;
+}
 
 int main(int argc, char *argv[])
 {   
@@ -156,17 +163,13 @@ int main(int argc, char *argv[])
     if (pol_init(&pol2, coef_arr2, THREAD_COUNT) == -1) return 1;
     pol_print(pol2);
 
-    Polynomial *sum;
-    long sum_degree = (pol1->degree > pol2->degree) ? pol1->degree : pol2->degree;
-    int *sum_coef_arr = malloc(sum_degree * sizeof(int));
-    if (!(sum_coef_arr)) return 1;
-    if (pol_init(&sum, sum_coef_arr, sum_degree) == -1) return 1;
-    pol_add(pol1, pol2, sum);
-    
-    pol_print(sum);
+    Polynomial *prod = pol_multiply(pol1, pol2);
+    if (!prod) return 1;
+    pol_print(prod);
 
     pol_destroy(&pol1);
     pol_destroy(&pol2);
+    pol_destroy(&prod);
 
     return 0;
 }
