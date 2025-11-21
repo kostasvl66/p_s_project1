@@ -10,13 +10,13 @@ T = 4      #THREAD_NUM
 .SILENT:
 
 run-main: clean
-	gcc $( CFLAGS ) main.c -o main -lm
+	gcc -g -Wall main.c -o main -lpthread -lm
 	echo "Running main"
 	./main $(A) $(TR) $(R) $(L) $ $(T)
 
 main:
 	echo "Compiling main"
-	gcc $( CFLAGS ) main.c -o main
+	gcc -g -Wall main.c -o main -lpthread -lm
 
 clean: main
 	echo "Cleaning"
