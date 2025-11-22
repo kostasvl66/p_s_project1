@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <pthread.h>
 
 // each polynomial coefficient a non-zero int within [-MAX_ABS_COEFFICIENT_VALUE, +MAX_ABS_COEFFICIENT_VALUE]
 #define MAX_ABS_COEFFICIENT_VALUE 1000
@@ -130,14 +131,24 @@ void pol_add(Polynomial *pol1, Polynomial *pol2, Polynomial *result)
     long degree1 = pol1->degree;
     long degree2 = pol2->degree;
 
-    // new degree is the largest of the two
-    result->degree = (degree1 > degree2) ? degree1 : degree2;
-
-    long min_degree = (degree1 < degree2) ? degree1 : degree2; // smallest of the two degrees
+    Polynomial *max_pol; // polynomial with the largest degree
+    long min_degree; // smallest of the two degrees
+    if (degree1 > degree2)
+    {
+        result->degree = degree1; // new degree is the largest of the two
+        max_pol = pol1;
+        min_degree = degree2;
+    }
+    else
+    {
+        result->degree = degree2;
+        max_pol = pol2;
+        min_degree = degree1;
+    }
+    
     for (long i = 0; i <= min_degree; i++)
         result->coef_arr[i] = pol1->coef_arr[i] + pol2->coef_arr[i];
 
-    Polynomial *max_pol = (degree1 > degree2) ? pol1 : pol2; // polynomial with the largest degree
     for (long i = min_degree + 1; i <= result->degree; i++)
         result->coef_arr[i] = max_pol->coef_arr[i];
 }
@@ -184,20 +195,20 @@ Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
 int main(int argc, char *argv[])
 {   
     if (parse_args(argc, argv) == -1) return 1;
-
+    
     srand(time(NULL));
 
     int *coef_arr1 = generate_random_coef(N);
     if (!coef_arr1) return 1;
     Polynomial *pol1;
     if (pol_init(&pol1, coef_arr1, N) == -1) return 1;
-    pol_print(pol1);
+    //pol_print(pol1);
 
-    int *coef_arr2 = generate_random_coef(THREAD_COUNT);
+    int *coef_arr2 = generate_random_coef(N);
     if (!coef_arr2) return 1;
     Polynomial *pol2;
-    if (pol_init(&pol2, coef_arr2, THREAD_COUNT) == -1) return 1;
-    pol_print(pol2);
+    if (pol_init(&pol2, coef_arr2, N) == -1) return 1;
+    //pol_print(pol2);
 
     struct timespec start, end;
 
@@ -207,12 +218,12 @@ int main(int argc, char *argv[])
     if (!prod) return 1;
     
     timespec_get(&end, TIME_UTC);
-    printf("Elapsed time: %.9f sec\n", elapsed(start, end));
-    pol_print(prod);
-
+    printf("Elapsed time: %.6f sec\n", elapsed(start, end));
+    //pol_print(prod);
+    
     pol_destroy(&pol1);
     pol_destroy(&pol2);
     pol_destroy(&prod);
-
+    
     return 0;
 }

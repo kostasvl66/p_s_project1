@@ -1,17 +1,11 @@
 CC = gcc
 CFLAGS = -Wall -O2
-LDFLAGS =
-LDLIBS = 
-ARGS = 10 1
+ARGS = 3 1
 
 PROGRAM = polynomials
-OBJ = polynomials.o
 
-$(PROGRAM): $(OBJ)
-	@$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
-
-polynomials.o: polynomials.c
-	@$(CC) $(CFLAGS) -c $< -o $@
+$(PROGRAM): polynomials.c
+	@$(CC) $(CFLAGS) $< -o $@ -lpthread
 
 run: $(PROGRAM)
 	./$(PROGRAM) $(ARGS)
