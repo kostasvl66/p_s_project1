@@ -9,12 +9,12 @@ int transactions_count;
 int balance_count;
 
 int rand_from_range(int range) {
-    int result = rand() % range;
+    int result = rand() % range + 1;
     return result;
 }
 
 // TODO: Implement transferring functionality
-void *write(void *arg) {
+void *transfer(void *arg) {
     int **temp = (int **)arg;
     int *list = *temp;
     // Loop for transactions
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 
     // Initializing writer threads
     for (long thread = 0; thread < writer_count; thread++) {
-        pthread_create(&writer_handle[thread], NULL, write, (void *)&balance_list);
+        pthread_create(&writer_handle[thread], NULL, transfer, (void *)&balance_list);
     }
 
     // Initializing reader threads
