@@ -274,11 +274,8 @@ void *calc_prod_i_worker(void *worker_params)
     long rank = temp->rank;
     long thread_count = temp->thread_count;
     long total_iterations = pol1->degree + 1;
-    long local_iterations = total_iterations / thread_count;
-    long start = rank * local_iterations; // inclusive
-    long end = (rank == thread_count - 1) ? total_iterations : start + local_iterations; // exclusive
 
-    for (long i = start; i < end; i++)
+    for (long i = rank; i < total_iterations; i += thread_count)
     {
         prod_i->degree = pol2->degree + i;
         for (long j = 0; j <= prod_i->degree; j++)
@@ -293,9 +290,7 @@ void *calc_prod_i_worker(void *worker_params)
     }
 
     pthread_mutex_lock(&lock);
-    //printf("Thread %ld: ", rank);
-    //pol_print(prod_i);
-    pol_add(acc, res, res); // adding prod_i to res
+    pol_add(acc, res, res); // adding acc to res
     pthread_mutex_unlock(&lock);
 
     return NULL;
