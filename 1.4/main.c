@@ -4,8 +4,19 @@
 #include <stdlib.h>
 #include <time.h>
 
+struct thread_arguments {
+    int **list_of_accounts;  // Pointer to the list used by all threads
+    int number_of_transfers; // Number of transfers specific to a thread
+};
+
 long thread_count;
+
 int transactions_count;
+int write_transactions_count;
+int read_transactions_count;
+
+int remaining_transfers;
+int remaining_reads;
 int balance_count;
 
 int rand_from_range(int range) {
@@ -13,12 +24,13 @@ int rand_from_range(int range) {
     return result;
 }
 
-// TODO: Implement transferring functionality
+// BUG: Lock functionality required
 void *transfer(void *arg) {
-    int **temp = (int **)arg;
-    int *list = *temp;
+    struct thread_arguments *argstruct = (struct thread_arguments *)arg;
+    int *list = *argstruct->list_of_accounts;
+    int transfers = argstruct->number_of_transfers;
     // Loop for transactions
-    for (int i = 0; i < transactions_count; i++) {
+    for (int i = 0; i < transfers; i++) {
         // Pick a balance randomly to remove a random amount from
         int sender = rand_from_range(balance_count);
         // printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
@@ -46,6 +58,7 @@ void *transfer(void *arg) {
 
 // TODO: Implement reading functionality
 void *read(void *arg) {
+
     printf("read works\n");
     return NULL;
 }
@@ -71,36 +84,59 @@ int main(int argc, char *argv[]) {
     }
     printf("\t]\n");
 
+    // TODO: Use the total number of transactions and the percentage of reading transactions to calculate the exact number of reading transactions,
+    // subtract that from the total to calculate the number of writing transactions,
+    // use these numbers to distribute threads efficiently(the more a type of transactions is used, the more threads should be allocated for it),
+    // maybe number_of_allocated_threads = total_number_of_threads * (number_of_writing_transactions / total_number_of_transactions)
+    // and number_of_allocated_threads = total_number_of_threads * (number_of_reading_transactions / total_number_of_transactions)
+    // then for the number_of_allocated_threads, each one gets an equal number of transactions to perform
+
+    // Calculating number of reading transactions based on the total number of transactions and percentage of reading transactions
+    // Using the ceil() function in cases where the calculation leads to a non-integer value, so that most transactions end up as reading ones
+    int read_transactions_count = ceil(((read_percentage / (float)100) * transactions_count));
+    printf("Number of reading transactions: %d\n", read_transactions_count);
+
+    // Number of writing transactions is just however many transactions remain from the total
+    write_transactions_count = transactions_count - read_transactions_count;
+    printf("Number of writing transactions: %d\n", write_transactions_count);
+
     // Calculating number of reading threads based on the given percentage of reading transactions
     double reader_calc = ((read_percentage / (float)100) * thread_count);
-    long reader_count = lround(reader_calc);
+    long reader_threads = lround(reader_calc);
 
-    long writer_count = thread_count - reader_count;
+    long transfer_threads = thread_count - reader_threads;
 
-    printf("Writers are: %ld, Readers are: %ld\n", writer_count, reader_count);
+    printf("Writers are: %ld, Readers are: %ld\n", transfer_threads, reader_threads);
 
-    pthread_t *writer_handle = malloc(writer_count * sizeof(pthread_t));
-    pthread_t *reader_handle = malloc(reader_count * sizeof(pthread_t));
+    pthread_t *writer_handle = malloc(transfer_threads * sizeof(pthread_t));
+    pthread_t *reader_handle = malloc(reader_threads * sizeof(pthread_t));
+
+    // Calculate maximum number of transactions a thread gets to perform
+    int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
+    remaining_transfers = write_transactions_count;
 
     clock_t start_time = clock();
 
     // Initializing writer threads
-    for (long thread = 0; thread < writer_count; thread++) {
-        pthread_create(&writer_handle[thread], NULL, transfer, (void *)&balance_list);
+    // TODO: Pass transactions_per_transfer_thread as an argument into each thread function, along with the balance_list in a structure
+    // retain a counter of remaining transfers
+    for (long thread = 0; thread < transfer_threads; thread++) {
+        struct thread_arguments args = {&balance_list, remaining_transfers};
+        pthread_create(&writer_handle[thread], NULL, transfer, (void *)&args);
     }
 
     // Initializing reader threads
-    for (long thread = 0; thread < reader_count; thread++) {
+    for (long thread = 0; thread < reader_threads; thread++) {
         pthread_create(&reader_handle[thread], NULL, read, (void *)&balance_list);
     }
 
     // Joining writer threads
-    for (long thread = 0; thread < writer_count; thread++) {
+    for (long thread = 0; thread < transfer_threads; thread++) {
         pthread_join(writer_handle[thread], NULL);
     }
 
     // Joining reader threads
-    for (long thread = 0; thread < reader_count; thread++) {
+    for (long thread = 0; thread < reader_threads; thread++) {
         pthread_join(reader_handle[thread], NULL);
     }
 
