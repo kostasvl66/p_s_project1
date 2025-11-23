@@ -275,6 +275,7 @@ void *calc_prod_i_worker(void *worker_params)
     long thread_count = temp->thread_count;
     long total_iterations = pol1->degree + 1;
 
+    // threads work in round robin for better load balance
     for (long i = rank; i < total_iterations; i += thread_count)
     {
         prod_i->degree = pol2->degree + i;
