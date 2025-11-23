@@ -21,25 +21,25 @@ void *transfer(void *arg) {
     for (int i = 0; i < transactions_count; i++) {
         // Pick a balance randomly to remove a random amount from
         int sender = rand_from_range(balance_count);
-        printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
+        // printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
 
         // Pick another balance randomly to add the random amount to, make sure it's not the same as the first
         int receiver = rand_from_range(balance_count);
         while (receiver == sender) {
             receiver = rand_from_range(balance_count);
         }
-        printf("Receiver is: %d, with balance: %d\n", receiver, list[receiver]);
+        // printf("Receiver is: %d, with balance: %d\n", receiver, list[receiver]);
 
         // Pick a random amount to remove from sender and add to receiver
         int transfer_amount = rand_from_range(100);
-        printf("Amount to transfer is: %d\n", transfer_amount);
+        // printf("Amount to transfer is: %d\n", transfer_amount);
 
         list[sender] = list[sender] - transfer_amount;
         list[receiver] = list[receiver] + transfer_amount;
 
         printf("Removed %d from sender: %d and added to receiver: %d\n", transfer_amount, sender, receiver);
-        printf("Sender balance is: %d\n", list[sender]);
-        printf("Receiver balance is: %d\n", list[receiver]);
+        // printf("Sender balance is: %d\n", list[sender]);
+        // printf("Receiver balance is: %d\n", list[receiver]);
     }
     return NULL;
 }
