@@ -8,6 +8,7 @@
 
 long N;
 long THREAD_COUNT;
+pthread_mutex_t lock;
 
 // checks command usage; returns 0 on success, -1 otherwise
 int parse_args(int argc, char *argv[])
@@ -42,7 +43,8 @@ double elapsed(struct timespec start, struct timespec end)
     return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
-typedef struct {
+typedef struct
+{
     int *coef_arr; // array of coefficients, each index maps to the same power
     long degree; // the largest power
 } Polynomial;
@@ -161,7 +163,7 @@ Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
 
     // new degree is the sum of the two
     res->degree = pol1->degree + pol2->degree;
-    res->coef_arr = malloc((res->degree + 1) * sizeof(int));
+    res->coef_arr = calloc(res->degree + 1, sizeof(int)); // initialized at 0
     if (!(res->coef_arr))
     {
         free(res);
@@ -181,9 +183,13 @@ Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
     for (long i = 0; i <= pol1->degree; i++)
     {
         prod_i.degree = pol2->degree + i;
-        pol_set_zero(&prod_i); // setting zero to overrite terms of power lower than (j + i)
-        for (long j = 0; j <= pol2->degree; j++)
-            prod_i.coef_arr[j + i] = pol1->coef_arr[i] * pol2->coef_arr[j]; // "shifting" each power by i and multiplying terms
+        for (long j = 0; j <= prod_i.degree; j++)
+        {
+            if (j < i)
+                prod_i.coef_arr[j] = 0;
+            else
+                prod_i.coef_arr[j] = pol1->coef_arr[i] * pol2->coef_arr[j - i];
+        }
 
         pol_add(&prod_i, res, res); // adding prod_i to res
     }
@@ -192,8 +198,231 @@ Polynomial *pol_multiply(Polynomial *pol1, Polynomial *pol2)
     return res;
 }
 
+// allocates 2d array (coef_arr for each thread) used like arr[thread][coef_index]
+// all coef_arrays have the same length (max_degree + 1)
+// returns NULL if failed
+int **allocate_coef_arr_per_thread(long thread_count, long max_degree)
+{
+    int **arr = malloc(thread_count * sizeof(int *));
+    if (!arr) return NULL;
+
+    arr[0] = malloc(thread_count * (max_degree + 1) * sizeof(int));
+    if (!arr[0]) 
+    {
+        free(arr);
+        return NULL;
+    }
+
+    for (long i = 1; i < thread_count; i++)
+        arr[i] = arr[0] + i * (max_degree + 1);
+
+    return arr;
+}
+
+// allocates 2d array (coef_arr for each thread) used like arr[thread][coef_index]
+// all coef_arrays have the same length (max_degree + 1) and are zero-initialized
+// returns NULL if failed
+int **zero_allocate_coef_arr_per_thread(long thread_count, long max_degree)
+{
+    int **arr = malloc(thread_count * sizeof(int *));
+    if (!arr) return NULL;
+
+    arr[0] = calloc(thread_count * (max_degree + 1), sizeof(int));
+    if (!arr[0]) 
+    {
+        free(arr);
+        return NULL;
+    }
+
+    for (long i = 1; i < thread_count; i++)
+        arr[i] = arr[0] + i * (max_degree + 1);
+
+    return arr;
+}
+
+void free_coef_arr_per_thread(int **coef_per_thread)
+{
+    free(coef_per_thread[0]);
+    free(coef_per_thread);
+}
+
+typedef struct
+{
+    long rank; // current thread index
+    long thread_count;
+    Polynomial *pol1;
+    Polynomial *pol2;
+    Polynomial *res;
+    Polynomial *prod_i_per_thread;
+    Polynomial *acc_per_thread;
+} WorkerParams;
+
+void *calc_prod_i_worker(void *worker_params)
+{    
+    WorkerParams *temp = worker_params;
+
+    // shared variables
+    Polynomial *pol1 = temp->pol1; // read only, can be used asynchronously
+    Polynomial *pol2 = temp->pol2; // read only, can be used asynchronously
+    Polynomial *res = temp->res; // read-write, needs synchronization
+    // read-write but only using the thread-indexed range (no overlapping between threads), can be used as if local
+    Polynomial *prod_i = &(temp->prod_i_per_thread)[temp->rank];
+    // read-write but only using the thread-indexed range (no overlapping between threads), can be used as if local
+    Polynomial *acc = &(temp->acc_per_thread)[temp->rank];
+
+    // local variables
+    long rank = temp->rank;
+    long thread_count = temp->thread_count;
+    long total_iterations = pol1->degree + 1;
+    long local_iterations = total_iterations / thread_count;
+    long start = rank * local_iterations; // inclusive
+    long end = (rank == thread_count - 1) ? total_iterations : start + local_iterations; // exclusive
+
+    for (long i = start; i < end; i++)
+    {
+        prod_i->degree = pol2->degree + i;
+        for (long j = 0; j <= prod_i->degree; j++)
+        {
+            if (j < i)
+                prod_i->coef_arr[j] = 0;
+            else
+                prod_i->coef_arr[j] = pol1->coef_arr[i] * pol2->coef_arr[j - i];
+        }
+
+        pol_add(prod_i, acc, acc);
+    }
+
+    pthread_mutex_lock(&lock);
+    //printf("Thread %ld: ", rank);
+    //pol_print(prod_i);
+    pol_add(acc, res, res); // adding prod_i to res
+    pthread_mutex_unlock(&lock);
+
+    return NULL;
+}
+
+Polynomial *pol_multiply_threaded(Polynomial *pol1, Polynomial *pol2, long thread_count)
+{
+    Polynomial *res = malloc(sizeof(Polynomial));
+    if (!res) return NULL;
+
+    // new degree is the sum of the two
+    res->degree = pol1->degree + pol2->degree;
+    res->coef_arr = calloc(res->degree + 1, sizeof(int)); // initialized at 0
+    if (!(res->coef_arr))
+    {
+        free(res);
+        return NULL;
+    }
+
+    // stores for each thread, the product of i-th pol1 term and the whole pol2
+    Polynomial *prod_i_per_thread = malloc(thread_count * sizeof(Polynomial));
+    if (!prod_i_per_thread)
+    {
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    // stores for each thread, the coef_arr that will be assigned to prod_i_per_thread[thread]
+    int **prod_i_coef_arr_per_thread = allocate_coef_arr_per_thread(thread_count, res->degree);
+    if (!prod_i_coef_arr_per_thread)
+    {
+        free(prod_i_per_thread);
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    for (long thread = 0; thread < thread_count; thread++) // assigns coefficient arrays
+        prod_i_per_thread[thread].coef_arr = prod_i_coef_arr_per_thread[thread];
+
+    // stores for each thread, an accumulator polynomial for partial sums, which are combined in the end to form res
+    Polynomial *acc_per_thread = malloc(thread_count * sizeof(Polynomial));
+    if (!acc_per_thread)
+    {
+        free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
+        free(prod_i_per_thread);
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    // stores for each thread, the coef_arr that will be assigned to acc_per_thread[thread]
+    int **acc_coef_arr_per_thread = zero_allocate_coef_arr_per_thread(thread_count, res->degree);
+    if (!acc_coef_arr_per_thread)
+    {
+        free(acc_per_thread);
+        free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
+        free(prod_i_per_thread);
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    for (long thread = 0; thread < thread_count; thread++) // assigns coefficient arrays
+        acc_per_thread[thread].coef_arr = acc_coef_arr_per_thread[thread];
+
+    // creating the threads
+    pthread_t *thread_handles = malloc(thread_count * sizeof(pthread_t));
+    if (!thread_handles)
+    {
+        free_coef_arr_per_thread(acc_coef_arr_per_thread);
+        free(acc_per_thread);
+        free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
+        free(prod_i_per_thread);
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    pthread_mutex_init(&lock, NULL); // initializing needed mutex
+
+    // preparing worker parameters (for all threads)
+    WorkerParams *wp_per_thread = malloc(thread_count * sizeof(WorkerParams));
+    if (!wp_per_thread)
+    {
+        free(thread_handles);
+        free_coef_arr_per_thread(acc_coef_arr_per_thread);
+        free(acc_per_thread);
+        free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
+        free(prod_i_per_thread);
+        free(res->coef_arr);
+        free(res);
+        return NULL;
+    }
+
+    for (long thread = 0; thread < thread_count; thread++)
+    {
+        wp_per_thread[thread].rank = thread;
+        wp_per_thread[thread].thread_count = thread_count;
+        wp_per_thread[thread].pol1 = pol1;
+        wp_per_thread[thread].pol2 = pol2;
+        wp_per_thread[thread].res = res;
+        wp_per_thread[thread].prod_i_per_thread = prod_i_per_thread;
+        wp_per_thread[thread].acc_per_thread = acc_per_thread;
+    }
+
+    for (long thread = 0; thread < thread_count; thread++)
+        pthread_create(&thread_handles[thread], NULL, calc_prod_i_worker, &wp_per_thread[thread]);
+
+    for (long thread = 0; thread < thread_count; thread++)
+        pthread_join(thread_handles[thread], NULL);
+
+    free(wp_per_thread);
+    free(thread_handles);
+    free_coef_arr_per_thread(acc_coef_arr_per_thread);
+    free(acc_per_thread);
+    free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
+    free(prod_i_per_thread);
+    return res;
+}
+
 int main(int argc, char *argv[])
 {   
+    struct timespec start_init, end_init, start_serial, end_serial, start_parallel, end_parallel;
+    timespec_get(&start_init, TIME_UTC);
+
     if (parse_args(argc, argv) == -1) return 1;
     
     srand(time(NULL));
@@ -207,23 +436,54 @@ int main(int argc, char *argv[])
     int *coef_arr2 = generate_random_coef(N);
     if (!coef_arr2) return 1;
     Polynomial *pol2;
-    if (pol_init(&pol2, coef_arr2, N) == -1) return 1;
+    if (pol_init(&pol2, coef_arr2, N) == -1)
+    {
+        pol_destroy(&pol1);
+        return 1;
+    } 
     //pol_print(pol2);
 
-    struct timespec start, end;
+    timespec_get(&end_init, TIME_UTC);
+    printf("Initialization:     %.6f sec\n", elapsed(start_init, end_init));
 
-    timespec_get(&start, TIME_UTC);
+    timespec_get(&start_serial, TIME_UTC);
 
-    Polynomial *prod = pol_multiply(pol1, pol2);
-    if (!prod) return 1;
-    
-    timespec_get(&end, TIME_UTC);
-    printf("Elapsed time: %.6f sec\n", elapsed(start, end));
-    //pol_print(prod);
+    Polynomial *prod1 = pol_multiply(pol1, pol2);
+    if (!prod1)
+    {
+        pol_destroy(&pol1);
+        pol_destroy(&pol2);
+        return 1;
+    }
+    //pol_print(prod1);
+
+    timespec_get(&end_serial, TIME_UTC);
+    printf("Serial algorithm:   %.6f sec\n", elapsed(start_serial, end_serial));
+
+    timespec_get(&start_parallel, TIME_UTC);
+
+    Polynomial *prod2 = pol_multiply_threaded(pol1, pol2, THREAD_COUNT);
+    if (!prod2)
+    {
+        pol_destroy(&pol1);
+        pol_destroy(&pol2);
+        pol_destroy(&prod1);
+        return 1;
+    }
+    //pol_print(prod2);
+
+    timespec_get(&end_parallel, TIME_UTC);
+    printf("Parallel algorithm: %.6f sec\n", elapsed(start_parallel, end_parallel));
+
+    if (pol_equals(prod1, prod2))
+        printf("Consistent results\n");
+    else
+        printf("Inconsistent results\n");
     
     pol_destroy(&pol1);
     pol_destroy(&pol2);
-    pol_destroy(&prod);
+    pol_destroy(&prod1);
+    pol_destroy(&prod2);
     
     return 0;
 }
