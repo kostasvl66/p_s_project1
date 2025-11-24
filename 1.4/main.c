@@ -52,6 +52,7 @@ void *transfer(void *arg) {
         printf("Removed %d from sender: %d and added to receiver: %d\n", transfer_amount, sender, receiver);
         // printf("Sender balance is: %d\n", list[sender]);
         // printf("Receiver balance is: %d\n", list[receiver]);
+        remaining_transfers--;
     }
     return NULL;
 }
@@ -63,8 +64,13 @@ void *read(void *arg) {
     return NULL;
 }
 
+double elapsed(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+}
+
 // TODO: Implement functionality for different types of locks
 int main(int argc, char *argv[]) {
+    struct timespec parallel_execution_start, parallel_execution_finish;
     balance_count = atoi(argv[1]);
     transactions_count = atoi(argv[2]);
     long read_percentage = atol(argv[3]);
@@ -112,10 +118,10 @@ int main(int argc, char *argv[]) {
     pthread_t *reader_handle = malloc(reader_threads * sizeof(pthread_t));
 
     // Calculate maximum number of transactions a thread gets to perform
-    int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
+    // int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
     remaining_transfers = write_transactions_count;
 
-    clock_t start_time = clock();
+    timespec_get(&parallel_execution_start, TIME_UTC);
 
     // Initializing writer threads
     // TODO: Pass transactions_per_transfer_thread as an argument into each thread function, along with the balance_list in a structure
@@ -140,11 +146,11 @@ int main(int argc, char *argv[]) {
         pthread_join(reader_handle[thread], NULL);
     }
 
-    clock_t end_time = clock();
+    timespec_get(&parallel_execution_finish, TIME_UTC);
 
-    double total_time = (double)(end_time - start_time) / (double)CLOCKS_PER_SEC;
+    double total_timespec = elapsed(parallel_execution_start, parallel_execution_finish);
 
-    printf("Total time of parallel execution was: %lf\n", total_time);
+    printf("Total timespec of parallel execution was: %lf\n", total_timespec);
 
     return 0;
 }
