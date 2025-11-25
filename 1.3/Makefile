@@ -1,10 +1,11 @@
 CC = gcc
-CFLAGS = -Wall -O2
-ARGS = 3 1
+BETTER ?= 0
+CFLAGS = -Wall -O2 -DBETTER=$(BETTER)
+ARGS = 10
 
-PROGRAM = polynomials
+PROGRAM = arrays
 
-$(PROGRAM): polynomials.c
+$(PROGRAM): arrays.c
 	@$(CC) $(CFLAGS) $< -o $@ -lpthread
 
 run: $(PROGRAM)
