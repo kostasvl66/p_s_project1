@@ -17,8 +17,6 @@ pthread_mutex_t mutex; // Mutex used for mutual exclusion lock implementation
 
 int transactions_count;
 
-int remaining_transfers;
-int remaining_reads;
 int balance_count;
 
 int rand_from_range(int range) {
@@ -52,7 +50,7 @@ void *transfer(void *arg) {
         list[sender] = list[sender] - transfer_amount;
         list[receiver] = list[receiver] + transfer_amount;
 
-        printf("Thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
+        printf("Transfer thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
         // printf("Sender balance is: %d\n", list[sender]);
         // printf("Receiver balance is: %d\n", list[receiver]);
     }
@@ -65,7 +63,24 @@ void *transfer(void *arg) {
 // BUG: Lock functionality required
 void *read(void *arg) {
 
-    printf("read works\n");
+    struct thread_arguments *argstruct = (struct thread_arguments *)arg;
+    int *list = *argstruct->list_of_accounts;
+    int reads = argstruct->number_of_transfers;
+    long my_rank = argstruct->thread_rank;
+    long balance_sum = 0;
+    // Loop for transactions
+    pthread_mutex_lock(&mutex);
+    for (int i = 0; i < reads; i++) {
+        // Pick a balance randomly to read its amount
+        int bal = rand_from_range(balance_count);
+
+        balance_sum += list[bal];
+        printf("Read balance: %d, of account: %d\n", list[bal], bal);
+    }
+    printf("Read thread: %ld, Sum of read balances is: %ld\n", my_rank, balance_sum);
+    pthread_mutex_unlock(&mutex);
+    free(argstruct);
+
     return NULL;
 }
 
@@ -74,6 +89,8 @@ double time_elapsed(struct timespec start, struct timespec end) {
 }
 
 // TODO: Implement functionality for different types of locks
+// TODO: The number of transactions for each thread to perform is given as input, the total is calculated as (number of threads * number of transactions)
+// a percentage of the total(given as input) is to be assigned to reading threads
 int main(int argc, char *argv[]) {
     // Timespec initialization
     struct timespec parallel_execution_start, parallel_execution_finish;
@@ -132,7 +149,12 @@ int main(int argc, char *argv[]) {
     // Calculate maximum number of transactions a thread gets to perform
     int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
     printf("transactions_per_transfer_thread is: %d\n", transactions_per_transfer_thread);
-    remaining_transfers = write_transactions_count;
+
+    int transactions_per_read_thread = ceil(read_transactions_count / (double)reader_threads);
+    printf("transactions_per_transfer_thread is: %d\n", transactions_per_read_thread);
+
+    int remaining_transfers = write_transactions_count;
+    int remaining_reads = read_transactions_count;
 
     timespec_get(&parallel_execution_start, TIME_UTC);
 
@@ -150,7 +172,7 @@ int main(int argc, char *argv[]) {
         args->number_of_transfers = transactions_per_transfer_thread;
         args->thread_rank = thread;
 
-        printf("Creating thread: %ld\n", thread);
+        printf("Creating transfer thread: %ld\n", thread);
         int create_res = pthread_create(&writer_handle[thread], NULL, transfer, (void *)args);
         if (create_res != 0) {
             printf("Thread creation error for thread %ld: %d(%s)\n", thread, create_res, strerror(create_res));
@@ -161,7 +183,20 @@ int main(int argc, char *argv[]) {
 
     // Initializing reader threads
     for (thread = 0; thread < reader_threads; thread++) {
-        pthread_create(&reader_handle[thread], NULL, read, (void *)&balance_list);
+        if (remaining_reads < transactions_per_read_thread) {
+            transactions_per_read_thread = remaining_reads;
+        }
+
+        struct thread_arguments *args = (struct thread_arguments *)malloc(sizeof(struct thread_arguments));
+
+        args->list_of_accounts = &balance_list;
+        args->number_of_transfers = transactions_per_transfer_thread;
+        args->thread_rank = thread;
+
+        printf("Creating read thread: %ld\n", thread);
+        pthread_create(&reader_handle[thread], NULL, read, (void *)args);
+
+        remaining_reads -= transactions_per_read_thread;
     }
 
     // Joining writer threads
