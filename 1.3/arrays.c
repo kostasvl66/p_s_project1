@@ -3,6 +3,22 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
+#include <stdalign.h> // needed for using alignas()
+
+#if BETTER == 1 // BETTER is defined in the compilation command
+
+// aligns both the whole struct and each of its members to 64 bytes, using appropriate padding
+// assuming a cache line is 64 bytes, this avoids false sharing
+
+#define CACHELINE 64
+alignas(CACHELINE) struct array_stats_s {
+    alignas(CACHELINE) long long int info_array_0;
+    alignas(CACHELINE) long long int info_array_1;
+    alignas(CACHELINE) long long int info_array_2;
+    alignas(CACHELINE) long long int info_array_3;
+} array_stats;
+
+#else
 
 struct array_stats_s {
     long long int info_array_0;
@@ -10,6 +26,8 @@ struct array_stats_s {
     long long int info_array_2;
     long long int info_array_3;
 } array_stats;
+
+#endif
 
 long long N;
 int *arrays[4];
@@ -145,6 +163,10 @@ void *count_non_zero_worker(void *rank)
 
 int main(int argc, char *argv[])
 {
+    #if BETTER == 1
+    printf("running with BETTER\n");
+    #endif
+
     struct timespec start_init, end_init, start_serial, end_serial, start_parallel, end_parallel;
     timespec_get(&start_init, TIME_UTC);
 
@@ -198,6 +220,8 @@ int main(int argc, char *argv[])
         printf("Consistent results\n");
     else
         printf("Inconsistent results\n");
+
+    //printf("Speed up: %.3f\n", elapsed(start_serial, end_serial) / elapsed(start_parallel, end_parallel));
 
     free_arrays();
 
