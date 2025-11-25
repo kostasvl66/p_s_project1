@@ -1,3 +1,6 @@
+#include <errno.h>
+#include <string.h>
+
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -7,29 +10,29 @@
 struct thread_arguments {
     int **list_of_accounts;  // Pointer to the list used by all threads
     int number_of_transfers; // Number of transfers specific to a thread
+    long int thread_rank;
 };
 
-long thread_count;
+pthread_mutex_t mutex; // Mutex used for mutual exclusion lock implementation
 
 int transactions_count;
-int write_transactions_count;
-int read_transactions_count;
 
 int remaining_transfers;
 int remaining_reads;
 int balance_count;
 
 int rand_from_range(int range) {
-    int result = rand() % range + 1;
+    int result = rand() % range;
     return result;
 }
 
-// BUG: Lock functionality required
 void *transfer(void *arg) {
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
     int *list = *argstruct->list_of_accounts;
     int transfers = argstruct->number_of_transfers;
+    long my_rank = argstruct->thread_rank;
     // Loop for transactions
+    pthread_mutex_lock(&mutex);
     for (int i = 0; i < transfers; i++) {
         // Pick a balance randomly to remove a random amount from
         int sender = rand_from_range(balance_count);
@@ -49,34 +52,43 @@ void *transfer(void *arg) {
         list[sender] = list[sender] - transfer_amount;
         list[receiver] = list[receiver] + transfer_amount;
 
-        printf("Removed %d from sender: %d and added to receiver: %d\n", transfer_amount, sender, receiver);
+        printf("Thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
         // printf("Sender balance is: %d\n", list[sender]);
         // printf("Receiver balance is: %d\n", list[receiver]);
-        remaining_transfers--;
     }
+    pthread_mutex_unlock(&mutex);
+    free(argstruct);
     return NULL;
 }
 
 // TODO: Implement reading functionality
+// BUG: Lock functionality required
 void *read(void *arg) {
 
     printf("read works\n");
     return NULL;
 }
 
-double elapsed(struct timespec start, struct timespec end) {
+double time_elapsed(struct timespec start, struct timespec end) {
     return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
 // TODO: Implement functionality for different types of locks
 int main(int argc, char *argv[]) {
+    // Timespec initialization
     struct timespec parallel_execution_start, parallel_execution_finish;
+
+    // Mutex initialization
+    pthread_mutex_init(&mutex, NULL);
+
+    // Receiving program arguments
     balance_count = atoi(argv[1]);
     transactions_count = atoi(argv[2]);
-    long read_percentage = atol(argv[3]);
+    long read_percentage = strtol(argv[3], NULL, 10);
     char *lock_type = argv[4];
     printf("Lock type: %s\n", lock_type);
-    thread_count = atol(argv[5]);
+    long thread_count = strtol(argv[5], NULL, 10);
+    long thread = 0;
 
     // Initializing list with 5 balance accounts
     int *balance_list = malloc(balance_count * sizeof(int));
@@ -103,7 +115,7 @@ int main(int argc, char *argv[]) {
     printf("Number of reading transactions: %d\n", read_transactions_count);
 
     // Number of writing transactions is just however many transactions remain from the total
-    write_transactions_count = transactions_count - read_transactions_count;
+    int write_transactions_count = transactions_count - read_transactions_count;
     printf("Number of writing transactions: %d\n", write_transactions_count);
 
     // Calculating number of reading threads based on the given percentage of reading transactions
@@ -118,7 +130,8 @@ int main(int argc, char *argv[]) {
     pthread_t *reader_handle = malloc(reader_threads * sizeof(pthread_t));
 
     // Calculate maximum number of transactions a thread gets to perform
-    // int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
+    int transactions_per_transfer_thread = ceil(write_transactions_count / (double)transfer_threads);
+    printf("transactions_per_transfer_thread is: %d\n", transactions_per_transfer_thread);
     remaining_transfers = write_transactions_count;
 
     timespec_get(&parallel_execution_start, TIME_UTC);
@@ -126,31 +139,55 @@ int main(int argc, char *argv[]) {
     // Initializing writer threads
     // TODO: Pass transactions_per_transfer_thread as an argument into each thread function, along with the balance_list in a structure
     // retain a counter of remaining transfers
-    for (long thread = 0; thread < transfer_threads; thread++) {
-        struct thread_arguments args = {&balance_list, remaining_transfers};
-        pthread_create(&writer_handle[thread], NULL, transfer, (void *)&args);
+    for (thread = 0; thread < transfer_threads; thread++) {
+        if (remaining_transfers < transactions_per_transfer_thread) {
+            transactions_per_transfer_thread = remaining_transfers;
+        }
+
+        struct thread_arguments *args = (struct thread_arguments *)malloc(sizeof(struct thread_arguments));
+
+        args->list_of_accounts = &balance_list;
+        args->number_of_transfers = transactions_per_transfer_thread;
+        args->thread_rank = thread;
+
+        printf("Creating thread: %ld\n", thread);
+        int create_res = pthread_create(&writer_handle[thread], NULL, transfer, (void *)args);
+        if (create_res != 0) {
+            printf("Thread creation error for thread %ld: %d(%s)\n", thread, create_res, strerror(create_res));
+            break;
+        }
+        remaining_transfers -= transactions_per_transfer_thread;
     }
 
     // Initializing reader threads
-    for (long thread = 0; thread < reader_threads; thread++) {
+    for (thread = 0; thread < reader_threads; thread++) {
         pthread_create(&reader_handle[thread], NULL, read, (void *)&balance_list);
     }
 
     // Joining writer threads
-    for (long thread = 0; thread < transfer_threads; thread++) {
+    for (thread = 0; thread < transfer_threads; thread++) {
         pthread_join(writer_handle[thread], NULL);
     }
 
     // Joining reader threads
-    for (long thread = 0; thread < reader_threads; thread++) {
+    for (thread = 0; thread < reader_threads; thread++) {
         pthread_join(reader_handle[thread], NULL);
     }
 
     timespec_get(&parallel_execution_finish, TIME_UTC);
 
-    double total_timespec = elapsed(parallel_execution_start, parallel_execution_finish);
+    double total_timespec = time_elapsed(parallel_execution_start, parallel_execution_finish);
 
     printf("Total timespec of parallel execution was: %lf\n", total_timespec);
+
+    printf("New list is: \n");
+    printf("[");
+    for (int i = 0; i < balance_count; i++) {
+        printf("\t%d,", balance_list[i]);
+    }
+    printf("\t]\n");
+
+    free(balance_list);
 
     return 0;
 }
