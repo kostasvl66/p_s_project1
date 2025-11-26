@@ -13,7 +13,45 @@ struct thread_arguments {
     long int thread_rank;
 };
 
-pthread_mutex_t mutex; // Mutex used for mutual exclusion lock implementation
+pthread_mutex_t mutex;   // Mutex used for mutual exclusion lock implementation
+pthread_rwlock_t rwlock; // RWlock used for Readers-Writers lock implementation
+char *lock_type;
+
+int mtxrw_init(char *text) {
+    if (strcmp(lock_type, "MUTEX")) {
+        // Mutex initialization
+        return pthread_mutex_init(&mutex, NULL);
+    } else if (strcmp(lock_type, "RW")) {
+        // RWlock initialization
+        return pthread_rwlock_init(&rwlock, NULL);
+    }
+    return -1;
+}
+
+int mtxrw_lock(char *lock, char *rw_type) {
+    if (strcmp(lock, "MUTEX")) {
+        // Mutex initialization
+        return pthread_mutex_lock(&mutex);
+    } else if (strcmp(lock, "RW") && strcmp(rw_type, "writer")) {
+        // RWlock initialization
+        return pthread_rwlock_wrlock(&rwlock);
+    } else if (strcmp(lock, "RW") && strcmp(rw_type, "reader")) {
+        // RWlock initialization
+        return pthread_rwlock_rdlock(&rwlock);
+    }
+    return -1;
+}
+
+int mtxrw_unlock(char *lock) {
+    if (strcmp(lock_type, "MUTEX")) {
+        // Mutex initialization
+        return pthread_mutex_unlock(&mutex);
+    } else if (strcmp(lock_type, "RW")) {
+        // RWlock initialization
+        return pthread_rwlock_unlock(&rwlock);
+    }
+    return -1;
+}
 
 int transactions_count;
 
@@ -24,17 +62,25 @@ int rand_from_range(int range) {
     return result;
 }
 
-void *transfer(void *arg) {
+void *coarse_grained_transfer(void *arg) {
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
     int *list = *argstruct->list_of_accounts;
     int transfers = argstruct->number_of_transfers;
     long my_rank = argstruct->thread_rank;
     // Loop for transactions
-    pthread_mutex_lock(&mutex);
     for (int i = 0; i < transfers; i++) {
+        // Pick a random amount to remove from sender and add to receiver
+        int transfer_amount = rand_from_range(100);
+
         // Pick a balance randomly to remove a random amount from
         int sender = rand_from_range(balance_count);
         // printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
+
+        // pthread_mutex_lock(&mutex);
+        mtxrw_lock(lock_type, "writer");
+        list[sender] = list[sender] - transfer_amount;
+        mtxrw_unlock(lock_type);
+        // pthread_mutex_unlock(&mutex);
 
         // Pick another balance randomly to add the random amount to, make sure it's not the same as the first
         int receiver = rand_from_range(balance_count);
@@ -43,25 +89,25 @@ void *transfer(void *arg) {
         }
         // printf("Receiver is: %d, with balance: %d\n", receiver, list[receiver]);
 
-        // Pick a random amount to remove from sender and add to receiver
-        int transfer_amount = rand_from_range(100);
-        // printf("Amount to transfer is: %d\n", transfer_amount);
-
-        list[sender] = list[sender] - transfer_amount;
+        // pthread_mutex_lock(&mutex);
+        mtxrw_lock(lock_type, "writer");
         list[receiver] = list[receiver] + transfer_amount;
+        mtxrw_unlock(lock_type);
+        // pthread_mutex_unlock(&mutex);
+        // pthread_mutex_unlock(&mutex);
+
+        // printf("Amount to transfer is: %d\n", transfer_amount);
 
         printf("Transfer thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
         // printf("Sender balance is: %d\n", list[sender]);
         // printf("Receiver balance is: %d\n", list[receiver]);
     }
-    pthread_mutex_unlock(&mutex);
     free(argstruct);
     return NULL;
 }
 
 // TODO: Implement reading functionality
-// BUG: Lock functionality required
-void *read(void *arg) {
+void *coarse_grained_read(void *arg) {
 
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
     int *list = *argstruct->list_of_accounts;
@@ -69,16 +115,19 @@ void *read(void *arg) {
     long my_rank = argstruct->thread_rank;
     long balance_sum = 0;
     // Loop for transactions
-    pthread_mutex_lock(&mutex);
     for (int i = 0; i < reads; i++) {
         // Pick a balance randomly to read its amount
         int bal = rand_from_range(balance_count);
 
+        // pthread_mutex_lock(&mutex);
+        mtxrw_lock(lock_type, "reader");
         balance_sum += list[bal];
+        mtxrw_unlock(lock_type);
+        // pthread_mutex_unlock(&mutex);
+
         printf("Read balance: %d, of account: %d\n", list[bal], bal);
     }
     printf("Read thread: %ld, Sum of read balances is: %ld\n", my_rank, balance_sum);
-    pthread_mutex_unlock(&mutex);
     free(argstruct);
 
     return NULL;
@@ -95,15 +144,16 @@ int main(int argc, char *argv[]) {
     // Timespec initialization
     struct timespec parallel_execution_start, parallel_execution_finish;
 
-    // Mutex initialization
-    pthread_mutex_init(&mutex, NULL);
-
     // Receiving program arguments
     balance_count = atoi(argv[1]);
     transactions_count = atoi(argv[2]);
     long read_percentage = strtol(argv[3], NULL, 10);
-    char *lock_type = argv[4];
+    lock_type = argv[4];
+
+    // Checking lock type
     printf("Lock type: %s\n", lock_type);
+    mtxrw_init(lock_type);
+
     long thread_count = strtol(argv[5], NULL, 10);
     long thread = 0;
 
@@ -119,20 +169,15 @@ int main(int argc, char *argv[]) {
     }
     printf("\t]\n");
 
-    // TODO: Use the total number of transactions and the percentage of reading transactions to calculate the exact number of reading transactions,
-    // subtract that from the total to calculate the number of writing transactions,
-    // use these numbers to distribute threads efficiently(the more a type of transactions is used, the more threads should be allocated for it),
-    // maybe number_of_allocated_threads = total_number_of_threads * (number_of_writing_transactions / total_number_of_transactions)
-    // and number_of_allocated_threads = total_number_of_threads * (number_of_reading_transactions / total_number_of_transactions)
-    // then for the number_of_allocated_threads, each one gets an equal number of transactions to perform
+    int total_transactions = transactions_count * thread_count;
 
     // Calculating number of reading transactions based on the total number of transactions and percentage of reading transactions
     // Using the ceil() function in cases where the calculation leads to a non-integer value, so that most transactions end up as reading ones
-    int read_transactions_count = ceil(((read_percentage / (float)100) * transactions_count));
+    int read_transactions_count = ceil(((read_percentage / (float)100) * total_transactions));
     printf("Number of reading transactions: %d\n", read_transactions_count);
 
     // Number of writing transactions is just however many transactions remain from the total
-    int write_transactions_count = transactions_count - read_transactions_count;
+    int write_transactions_count = total_transactions - read_transactions_count;
     printf("Number of writing transactions: %d\n", write_transactions_count);
 
     // Calculating number of reading threads based on the given percentage of reading transactions
@@ -173,7 +218,7 @@ int main(int argc, char *argv[]) {
         args->thread_rank = thread;
 
         printf("Creating transfer thread: %ld\n", thread);
-        int create_res = pthread_create(&writer_handle[thread], NULL, transfer, (void *)args);
+        int create_res = pthread_create(&writer_handle[thread], NULL, coarse_grained_transfer, (void *)args);
         if (create_res != 0) {
             printf("Thread creation error for thread %ld: %d(%s)\n", thread, create_res, strerror(create_res));
             break;
@@ -194,7 +239,7 @@ int main(int argc, char *argv[]) {
         args->thread_rank = thread;
 
         printf("Creating read thread: %ld\n", thread);
-        pthread_create(&reader_handle[thread], NULL, read, (void *)args);
+        pthread_create(&reader_handle[thread], NULL, coarse_grained_read, (void *)args);
 
         remaining_reads -= transactions_per_read_thread;
     }
