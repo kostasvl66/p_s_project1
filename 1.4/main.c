@@ -15,53 +15,64 @@ struct thread_arguments {
 
 pthread_mutex_t mutex;   // Mutex used for mutual exclusion lock implementation
 pthread_rwlock_t rwlock; // RWlock used for Readers-Writers lock implementation
-char *lock_type;
+char *lock_type;         // String used to determine the type of lock which must be used during execution (Values are "MUTEX" and "RW")
 
-int mtxrw_init(char *text) {
-    if (strcmp(lock_type, "MUTEX")) {
+int mtxrw_init(char *lock, pthread_mutex_t *mtx, pthread_rwlock_t *rw) {
+    if (!strcmp(lock, "MUTEX_COARSEGRAINED") || !strcmp(lock, "MUTEX_FINEGRAINED")) {
+        printf("init mutex\n");
         // Mutex initialization
-        return pthread_mutex_init(&mutex, NULL);
-    } else if (strcmp(lock_type, "RW")) {
+        return pthread_mutex_init(mtx, NULL);
+    } else if (!strcmp(lock, "RW_COARSEGRAINED") || !strcmp(lock, "RW_FINEGRAINED")) {
+        printf("init rw\n");
         // RWlock initialization
-        return pthread_rwlock_init(&rwlock, NULL);
+        return pthread_rwlock_init(rw, NULL);
     }
     return -1;
 }
 
-int mtxrw_lock(char *lock, char *rw_type) {
-    if (strcmp(lock, "MUTEX")) {
-        // Mutex initialization
-        return pthread_mutex_lock(&mutex);
-    } else if (strcmp(lock, "RW") && strcmp(rw_type, "writer")) {
-        // RWlock initialization
-        return pthread_rwlock_wrlock(&rwlock);
-    } else if (strcmp(lock, "RW") && strcmp(rw_type, "reader")) {
-        // RWlock initialization
-        return pthread_rwlock_rdlock(&rwlock);
+int mtxrw_lock(char *lock, char *rw_type, pthread_mutex_t *mtx, pthread_rwlock_t *rw) {
+    if (!strcmp(lock, "MUTEX_COARSEGRAINED") || !strcmp(lock, "MUTEX_FINEGRAINED")) {
+        printf("lock mutex\n");
+        // Mutex locking
+        return pthread_mutex_lock(mtx);
+    } else if ((!strcmp(lock, "RW_COARSEGRAINED") || !strcmp(lock, "RW_FINEGRAINED")) && !strcmp(rw_type, "writer")) {
+        printf("lock rw writer\n");
+        // Writer lock locking
+        return pthread_rwlock_wrlock(rw);
+    } else if ((!strcmp(lock, "RW_COARSEGRAINED") || !strcmp(lock, "RW_FINEGRAINED")) && !strcmp(rw_type, "reader")) {
+        printf("lock rw reader\n");
+        // Reader lock locking
+        return pthread_rwlock_rdlock(rw);
     }
     return -1;
 }
 
-int mtxrw_unlock(char *lock) {
-    if (strcmp(lock_type, "MUTEX")) {
-        // Mutex initialization
-        return pthread_mutex_unlock(&mutex);
-    } else if (strcmp(lock_type, "RW")) {
-        // RWlock initialization
-        return pthread_rwlock_unlock(&rwlock);
+int mtxrw_unlock(char *lock, pthread_mutex_t *mtx, pthread_rwlock_t *rw) {
+    if (!strcmp(lock, "MUTEX_COARSEGRAINED") || !strcmp(lock, "MUTEX_FINEGRAINED")) {
+        printf("unlock mutex\n");
+        // Mutex unlocking
+        return pthread_mutex_unlock(mtx);
+    } else if (!strcmp(lock, "RW_COARSEGRAINED") || !strcmp(lock, "RW_FINEGRAINED")) {
+        printf("unlock rw\n");
+        // RWlock unlocking
+        return pthread_rwlock_unlock(rw);
     }
     return -1;
 }
 
-int transactions_count;
+int transactions_count; // Number of transactions for each thread to perform
 
-int balance_count;
+int balance_count; // Size of the list of balances used for dynamic allocation
+pthread_mutex_t *mutex_list;
+pthread_rwlock_t *rw_list;
 
-int rand_from_range(int range) {
-    int result = rand() % range;
+/*Returns a random number in the range 0 - <range_max>*/
+int rand_from_range(int range_max) {
+    int result = rand() % range_max;
     return result;
 }
 
+/*Thread function for performing transfer transactions*/
 void *coarse_grained_transfer(void *arg) {
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
     int *list = *argstruct->list_of_accounts;
@@ -77,9 +88,9 @@ void *coarse_grained_transfer(void *arg) {
         // printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
 
         // pthread_mutex_lock(&mutex);
-        mtxrw_lock(lock_type, "writer");
+        // mtxrw_lock(lock_type, "writer", &mutex, &rwlock);
         list[sender] = list[sender] - transfer_amount;
-        mtxrw_unlock(lock_type);
+        // mtxrw_unlock(lock_type, &mutex, &rwlock);
         // pthread_mutex_unlock(&mutex);
 
         // Pick another balance randomly to add the random amount to, make sure it's not the same as the first
@@ -90,9 +101,9 @@ void *coarse_grained_transfer(void *arg) {
         // printf("Receiver is: %d, with balance: %d\n", receiver, list[receiver]);
 
         // pthread_mutex_lock(&mutex);
-        mtxrw_lock(lock_type, "writer");
+        // mtxrw_lock(lock_type, "writer", &mutex, &rwlock);
         list[receiver] = list[receiver] + transfer_amount;
-        mtxrw_unlock(lock_type);
+        // mtxrw_unlock(lock_type, &mutex, &rwlock);
         // pthread_mutex_unlock(&mutex);
         // pthread_mutex_unlock(&mutex);
 
@@ -106,7 +117,7 @@ void *coarse_grained_transfer(void *arg) {
     return NULL;
 }
 
-// TODO: Implement reading functionality
+/*Thread function for performing reading/printing transactions*/
 void *coarse_grained_read(void *arg) {
 
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
@@ -120,9 +131,77 @@ void *coarse_grained_read(void *arg) {
         int bal = rand_from_range(balance_count);
 
         // pthread_mutex_lock(&mutex);
-        mtxrw_lock(lock_type, "reader");
+        // mtxrw_lock(lock_type, "reader", &mutex, &rwlock);
         balance_sum += list[bal];
-        mtxrw_unlock(lock_type);
+        // mtxrw_unlock(lock_type, &mutex, &rwlock);
+        // pthread_mutex_unlock(&mutex);
+
+        printf("Read balance: %d, of account: %d\n", list[bal], bal);
+    }
+    printf("Read thread: %ld, Sum of read balances is: %ld\n", my_rank, balance_sum);
+    free(argstruct);
+
+    return NULL;
+}
+
+void *fine_grained_transfer(void *arg) {
+    struct thread_arguments *argstruct = (struct thread_arguments *)arg;
+    int *list = *argstruct->list_of_accounts;
+    int transfers = argstruct->number_of_transfers;
+    long my_rank = argstruct->thread_rank;
+    // Loop for transactions
+    for (int i = 0; i < transfers; i++) {
+        // Pick a random amount to remove from sender and add to receiver
+        int transfer_amount = rand_from_range(100);
+
+        // Pick a balance randomly to remove a random amount from
+        int sender = rand_from_range(balance_count);
+        // printf("Sender is: %d, with balance: %d\n", sender, list[sender]);
+
+        // pthread_mutex_lock(&mutex);
+        mtxrw_lock(lock_type, "writer", &mutex_list[sender], &rw_list[sender]);
+        list[sender] = list[sender] - transfer_amount;
+        mtxrw_unlock(lock_type, &mutex_list[sender], &rw_list[sender]);
+        // pthread_mutex_unlock(&mutex);
+
+        // Pick another balance randomly to add the random amount to, make sure it's not the same as the first
+        int receiver = rand_from_range(balance_count);
+        while (receiver == sender) {
+            receiver = rand_from_range(balance_count);
+        }
+        // printf("Receiver is: %d, with balance: %d\n", receiver, list[receiver]);
+
+        // pthread_mutex_lock(&mutex);
+        list[receiver] = list[receiver] + transfer_amount;
+        // pthread_mutex_unlock(&mutex);
+        // pthread_mutex_unlock(&mutex);
+
+        // printf("Amount to transfer is: %d\n", transfer_amount);
+
+        printf("Transfer thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
+        // printf("Sender balance is: %d\n", list[sender]);
+        // printf("Receiver balance is: %d\n", list[receiver]);
+    }
+    free(argstruct);
+    return NULL;
+}
+
+void *fine_grained_read(void *arg) {
+
+    struct thread_arguments *argstruct = (struct thread_arguments *)arg;
+    int *list = *argstruct->list_of_accounts;
+    int reads = argstruct->number_of_transfers;
+    long my_rank = argstruct->thread_rank;
+    long balance_sum = 0;
+    // Loop for transactions
+    for (int i = 0; i < reads; i++) {
+        // Pick a balance randomly to read its amount
+        int bal = rand_from_range(balance_count);
+
+        // pthread_mutex_lock(&mutex);
+        mtxrw_lock(lock_type, "writer", &mutex_list[bal], &rw_list[bal]);
+        balance_sum += list[bal];
+        mtxrw_unlock(lock_type, &mutex_list[bal], &rw_list[bal]);
         // pthread_mutex_unlock(&mutex);
 
         printf("Read balance: %d, of account: %d\n", list[bal], bal);
@@ -150,9 +229,16 @@ int main(int argc, char *argv[]) {
     long read_percentage = strtol(argv[3], NULL, 10);
     lock_type = argv[4];
 
-    // Checking lock type
+    // Checking and initializing lock type
     printf("Lock type: %s\n", lock_type);
-    mtxrw_init(lock_type);
+    mtxrw_init(lock_type, &mutex, &rwlock);
+
+    // Initializing list of locks
+    mutex_list = malloc(balance_count * sizeof(pthread_mutex_t));
+    rw_list = malloc(balance_count * sizeof(pthread_rwlock_t));
+    for (int k = 0; k < balance_count; k++) {
+        mtxrw_init(lock_type, &mutex_list[k], &rw_list[k]);
+    }
 
     long thread_count = strtol(argv[5], NULL, 10);
     long thread = 0;
