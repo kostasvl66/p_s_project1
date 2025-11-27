@@ -15,10 +15,15 @@ void *increment(void *num) {
     return NULL;
 }
 
+/*Calculates the time elapsed between two instances of the timespec structure*/
+double time_elapsed(struct timespec start, struct timespec end) {
+    return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+}
+
 /*This implementation results in a non-deterministic value on the "shared" variable*/
-// TODO:RETURN LONG LATERRRRRR
 int main(int argc, char *argv[]) {
     printf("------------Starting atomic-------------\n");
+    struct timespec execution_start, execution_finish;
     long thread;
     pthread_t *thread_handle = NULL;
 
@@ -32,6 +37,9 @@ int main(int argc, char *argv[]) {
 
     // Allocating memory for thread data
     thread_handle = malloc(thread_count * sizeof(pthread_t));
+
+    // Get the starting time of execution
+    timespec_get(&execution_start, TIME_UTC);
 
     // Creating threads
     for (thread = 0; thread < thread_count; thread++) {
@@ -51,8 +59,15 @@ int main(int argc, char *argv[]) {
     free(thread_handle);
     thread_handle = NULL;
 
+    // Get the finishing time of execution
+    timespec_get(&execution_finish, TIME_UTC);
+
+    // Calculate total tine of execution
+    double execution_time = time_elapsed(execution_start, execution_finish);
+
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
+    printf("Time of execution is: %lf\n", execution_time);
     printf("----------Shutting down atomic----------\n\n");
 
     return 0;
