@@ -44,7 +44,7 @@ void *loop_worker(void *args)
 {
     for (long i = 0; i < N; i++)
     {
-        pthread_barrier_wait(&barrier);
+        pthread_barrier_wait(&barrier); // calling the POSIX implemented barrier wait
     }
     
     return NULL;
