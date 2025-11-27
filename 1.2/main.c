@@ -52,15 +52,15 @@ int main(int argc, char *argv[]) {
         pthread_join(thread_handle[thread], NULL);
     }
 
-    // Clearing allocated memory
-    free(thread_handle);
-    thread_handle = NULL;
-
     // Get the finishing time of execution
     timespec_get(&execution_finish, TIME_UTC);
 
     // Calculate total tine of execution
     double execution_time = time_elapsed(execution_start, execution_finish);
+
+    // Clearing allocated memory
+    free(thread_handle);
+    thread_handle = NULL;
 
     // Printing value after all increments are finished
     printf("Final value of variable is: %ld\n", shared);

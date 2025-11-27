@@ -237,11 +237,11 @@ int main(int argc, char *argv[]) {
     // pthread_rwlock_init(&rwlock, NULL);
 
     // Initializing list of locks
-    // mutex_list = malloc(balance_count * sizeof(pthread_mutex_t));
-    // rw_list = malloc(balance_count * sizeof(pthread_rwlock_t));
-    // for (int k = 0; k < balance_count; k++) {
-    //     mtxrw_init(lock_type, &mutex_list[k], &rw_list[k]);
-    // }
+    mutex_list = malloc(balance_count * sizeof(pthread_mutex_t));
+    rw_list = malloc(balance_count * sizeof(pthread_rwlock_t));
+    for (int k = 0; k < balance_count; k++) {
+        mtxrw_init(lock_type, &mutex_list[k], &rw_list[k]);
+    }
 
     long thread_count = strtol(argv[5], NULL, 10);
     long thread = 0;
@@ -305,7 +305,7 @@ int main(int argc, char *argv[]) {
         args->thread_rank = thread;
 
         printf("Creating read thread: %ld\n", thread);
-        pthread_create(&reader_handle[thread], NULL, coarse_grained_read, (void *)args);
+        pthread_create(&reader_handle[thread], NULL, fine_grained_read, (void *)args);
 
         remaining_reads -= transactions_per_read_thread;
     }
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
         args->thread_rank = thread;
 
         printf("Creating transfer thread: %ld\n", thread);
-        int create_res = pthread_create(&writer_handle[thread], NULL, coarse_grained_transfer, (void *)args);
+        int create_res = pthread_create(&writer_handle[thread], NULL, fine_grained_transfer, (void *)args);
         if (create_res != 0) {
             printf("Thread creation error for thread %ld: %d(%s)\n", thread, create_res, strerror(create_res));
             break;

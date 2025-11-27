@@ -55,15 +55,15 @@ int main(int argc, char *argv[]) {
         pthread_join(thread_handle[thread], NULL);
     }
 
-    // Clearing allocated memory
-    free(thread_handle);
-    thread_handle = NULL;
-
     // Get the finishing time of execution
     timespec_get(&execution_finish, TIME_UTC);
 
     // Calculate total tine of execution
     double execution_time = time_elapsed(execution_start, execution_finish);
+
+    // Clearing allocated memory
+    free(thread_handle);
+    thread_handle = NULL;
 
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);
