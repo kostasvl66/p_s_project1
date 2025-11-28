@@ -411,6 +411,7 @@ Polynomial *pol_multiply_threaded(Polynomial *pol1, Polynomial *pol2, long threa
     free(acc_per_thread);
     free_coef_arr_per_thread(prod_i_coef_arr_per_thread);
     free(prod_i_per_thread);
+    pthread_mutex_destroy(&lock);
     return res;
 }
 

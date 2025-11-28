@@ -1,11 +1,11 @@
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -Wall -O2 -pthread
 ARGS = 3 1
 
 PROGRAM = polynomials
 
 $(PROGRAM): polynomials.c
-	@$(CC) $(CFLAGS) $< -o $@ -lpthread
+	@$(CC) $(CFLAGS) $< -o $@
 
 run: $(PROGRAM)
 	./$(PROGRAM) $(ARGS)
