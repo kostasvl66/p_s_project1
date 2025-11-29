@@ -221,8 +221,6 @@ int main(int argc, char *argv[])
     else
         printf("Inconsistent results\n");
 
-    //printf("Speed up: %.3f\n", elapsed(start_serial, end_serial) / elapsed(start_parallel, end_parallel));
-
     free_arrays();
 
     return 0;
