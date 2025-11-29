@@ -3,13 +3,13 @@
 #include <stdlib.h>
 
 int thread_count;
-long iterations;
+long increment_count;
 
 /*Simple function to iteratively increment a shared integer one million times*/
 void *increment(void *num) {
     // Pointer to given argument(shared variable) must be initialized as _Atomic Long so that the following operations remain thread-safe
     _Atomic long *val = (_Atomic long *)num;
-    for (long i = 0; i < iterations; i++) {
+    for (long i = 0; i < increment_count; i++) {
         *val += 1;
     }
     return NULL;
@@ -20,16 +20,23 @@ double time_elapsed(struct timespec start, struct timespec end) {
     return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
-/*This implementation results in a non-deterministic value on the "shared" variable*/
+/*This implementation results in a deterministic value on the "shared" variable, utilizing atomix variables*/
 int main(int argc, char *argv[]) {
     printf("------------Starting atomic-------------\n");
+    FILE *fileptr;
     struct timespec execution_start, execution_finish;
     long thread;
     pthread_t *thread_handle = NULL;
 
-    // Receiving number of threads from command line
+    // Receiving number of threads and number of increments from command line
     thread_count = strtol(argv[1], NULL, 10);
-    iterations = strtol(argv[2], NULL, 10);
+    increment_count = strtol(argv[2], NULL, 10);
+
+    // Opening file for storing execution time
+    fileptr = fopen("results.txt", "a");
+    if (fileptr == NULL) {
+        perror("File could not be opened");
+    }
 
     // Initializing shared variable as an Atomic Long so that it's used in a thread-safe manner
     _Atomic long shared = 0;
@@ -61,9 +68,13 @@ int main(int argc, char *argv[]) {
     // Calculate total tine of execution
     double execution_time = time_elapsed(execution_start, execution_finish);
 
+    // Writing final execution time to the "results.txt file"
+    fprintf(fileptr, "%lf\n", execution_time);
+
     // Clearing allocated memory
     free(thread_handle);
     thread_handle = NULL;
+    fclose(fileptr);
 
     // Expected deterministic value is 4000000, if we have 4 threads incrementing the value 1000000 times each
     printf("Final value of variable is: %ld\n", shared);

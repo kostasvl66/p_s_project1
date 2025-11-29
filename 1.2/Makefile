@@ -1,8 +1,13 @@
 CFLAGS = -g -Wall -lpthread
-T = 4
-R = 1000000
+T = 4       #Number of threads used for program execution
+R = 1000000 #Number of times a thread function increments the shared variable
+S = 5       #Number of sample executions for each program
 
 .SILENT:
+
+test:
+	chmod +x compare_script.sh
+	./compare_script.sh 5 $(T) $(R)
 
 run-all: run-main run-mutex run-rw run-atomic
 
@@ -26,7 +31,7 @@ mutex:
 
 run-rw: clean
 	gcc $(CFLAGS) rw.c -o rw
-	echo "Running erw implementation"
+	echo "Running rw implementation"
 	./rw $(T) $(R)
 
 rw: 
@@ -40,6 +45,13 @@ run-atomic: clean
 atomic: 
 	gcc $(CFLAGS) atomic.c -o atomic
 
-clean: main mutex rw atomic
+compare:
+	gcc -g -Wall compare.c -o compare
+
+clean: main mutex rw atomic compare
 	echo "Cleaning"
-	rm main mutex rw atomic
+	rm main mutex rw atomic compare
+
+clean-out: clean
+	echo "Removing output files"
+	rm  main.out mutex.out rw.out atomic.out

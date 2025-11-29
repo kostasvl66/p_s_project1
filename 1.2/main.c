@@ -4,11 +4,12 @@
 #include <time.h>
 
 int thread_count;
+long increment_count;
 
 /*Simple function to iteratively increment a shared integer one million times*/
 void *increment(void *num) {
     long *val = (long *)num;
-    for (long i = 0; i < 1000000; i++) {
+    for (long i = 0; i < increment_count; i++) {
         *val += 1;
     }
     return NULL;
@@ -22,12 +23,20 @@ double time_elapsed(struct timespec start, struct timespec end) {
 /*This implementation results in a non-deterministic value on the "shared" variable*/
 int main(int argc, char *argv[]) {
     printf("------------Starting main-------------\n");
+    FILE *fileptr;
     struct timespec execution_start, execution_finish;
     long thread;
     pthread_t *thread_handle = NULL;
 
-    // Receiving number of threads from command line
+    // Opening file for storing execution time
+    fileptr = fopen("results.txt", "a");
+    if (fileptr == NULL) {
+        perror("File could not be opened");
+    }
+
+    // Receiving number of threads number of increments from command line
     thread_count = strtol(argv[1], NULL, 10);
+    increment_count = strtol(argv[2], NULL, 10);
 
     long shared = 0;
     printf("Starting value of shared variable is: %ld\n", shared);
@@ -58,9 +67,13 @@ int main(int argc, char *argv[]) {
     // Calculate total tine of execution
     double execution_time = time_elapsed(execution_start, execution_finish);
 
+    // Writing final execution time to the "results.txt file"
+    fprintf(fileptr, "%lf\n", execution_time);
+
     // Clearing allocated memory
     free(thread_handle);
     thread_handle = NULL;
+    fclose(fileptr);
 
     // Printing value after all increments are finished
     printf("Final value of variable is: %ld\n", shared);
