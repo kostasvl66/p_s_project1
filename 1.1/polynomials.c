@@ -372,8 +372,6 @@ Polynomial *pol_multiply_threaded(Polynomial *pol1, Polynomial *pol2, long threa
         return NULL;
     }
 
-    pthread_mutex_init(&lock, NULL); // initializing needed mutex
-
     // preparing worker parameters (for all threads)
     WorkerParams *wp_per_thread = malloc(thread_count * sizeof(WorkerParams));
     if (!wp_per_thread)
@@ -398,6 +396,8 @@ Polynomial *pol_multiply_threaded(Polynomial *pol1, Polynomial *pol2, long threa
         wp_per_thread[thread].prod_i_per_thread = prod_i_per_thread;
         wp_per_thread[thread].acc_per_thread = acc_per_thread;
     }
+
+    pthread_mutex_init(&lock, NULL); // initializing needed mutex
 
     for (long thread = 0; thread < thread_count; thread++)
         pthread_create(&thread_handles[thread], NULL, calc_prod_i_worker, &wp_per_thread[thread]);

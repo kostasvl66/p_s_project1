@@ -10,7 +10,7 @@ Ms = [2, 4, 8, 16] # number of threads to try
 J = 4
 
 PROGRAMS = ["./barrier_q1", "./barrier_q2"]
-LOG_FILE = "barrier_benchmark_log.txt"
+LOG_FILE = "benchmark_log.txt"
 
 # -----------------------------
 # FLOAT EXTRACTION REGEX
