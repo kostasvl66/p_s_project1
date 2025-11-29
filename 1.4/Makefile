@@ -1,10 +1,10 @@
 CFLAGS = -g -Wall -lpthread 
 
-A = 5      #ARRAY_SIZE
-TR = 5     #TRANSACTION_NUM
-R = 50     #READ_PERCENTAGE
-L = MUTEX  #LOCK_TYPE
-T = 4      #THREAD_NUM
+A = 5                    #ARRAY_SIZE
+TR = 5                   #TRANSACTION_NUM
+R = 50                   #READ_PERCENTAGE
+L = MUTEX_COARSEGRAINED  #LOCK_TYPE
+T = 4                    #THREAD_NUM
 
 
 .SILENT:
