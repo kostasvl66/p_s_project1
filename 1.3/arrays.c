@@ -164,7 +164,7 @@ void *count_non_zero_worker(void *rank)
 int main(int argc, char *argv[])
 {
     #if BETTER == 1
-    printf("running with BETTER\n");
+    printf("running without false sharing\n");
     #endif
 
     struct timespec start_init, end_init, start_serial, end_serial, start_parallel, end_parallel;
