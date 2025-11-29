@@ -117,13 +117,6 @@ int pol_equals(Polynomial *pol1, Polynomial *pol2)
     return 1;
 }
 
-// sets every term of a polynomial to zero without changing degree (useful for multiplication)
-void pol_set_zero(Polynomial *pol)
-{
-    for (long i = 0; i <= pol->degree; i++)
-        pol->coef_arr[i] = 0;
-}
-
 // result receives the sum of two polynomials; returns 0 if successful, -1 otherwise
 // result is expected to have allocated large enough coef_arr, and only the terms up to the degree are updated
 // this function works properly even if pol1 or pol2 points to the same memory as result
@@ -240,6 +233,7 @@ int **zero_allocate_coef_arr_per_thread(long thread_count, long max_degree)
     return arr;
 }
 
+// frees 2d array allocated either by allocate_coef_arr_per_thread or zero_allocate_coef_arr_per_thread
 void free_coef_arr_per_thread(int **coef_per_thread)
 {
     free(coef_per_thread[0]);
