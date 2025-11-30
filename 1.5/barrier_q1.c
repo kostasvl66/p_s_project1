@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
     pthread_t *thread_handles = malloc(THREAD_COUNT * sizeof(pthread_t));
     if (!thread_handles) return 1;
 
-    pthread_barrier_init(&barrier, NULL, THREAD_COUNT);
+    pthread_barrier_init(&barrier, NULL, THREAD_COUNT); // using THREAD_COUNT so it waits for ALL threads
 
     struct timespec start, end;
     timespec_get(&start, TIME_UTC);
