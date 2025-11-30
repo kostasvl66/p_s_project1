@@ -75,7 +75,6 @@ void *balance_transfer(void *arg) {
     struct thread_arguments *argstruct = (struct thread_arguments *)arg;
     int *list = *argstruct->list_of_accounts;
     int transfers = argstruct->number_of_transfers;
-    // long my_rank = argstruct->thread_rank;
     // Loop for transactions
     for (int i = 0; i < transfers; i++) {
         // Pick a random amount to remove from sender and add to receiver
@@ -117,8 +116,6 @@ void *balance_transfer(void *arg) {
         } else {
             mtxrw_unlock(lock_type, &mutex, &rwlock);
         }
-
-        // printf("Transfer thread: %ld removed %d from sender: %d and added to receiver: %d\n", my_rank, transfer_amount, sender, receiver);
     }
     return NULL;
 }
@@ -148,8 +145,6 @@ void *balance_read(void *arg) {
         } else {
             mtxrw_unlock(lock_type, &mutex, &rwlock);
         }
-
-        // printf("Read balance: %d, of account: %d\n", list[bal], bal);
     }
     printf("Read thread: %ld, Sum of read balances is: %ld\n", my_rank, balance_sum);
 
@@ -221,28 +216,16 @@ int main(int argc, char *argv[]) {
     // Calculating number of reading transactions based on the total number of transactions and percentage of reading transactions
     // Using the ceil() function in cases where the calculation leads to a non-integer value, so that most transactions end up as reading ones
     int read_transactions_count = ceil(((read_percentage / (float)100) * total_transactions));
-    // printf("Number of reading transactions: %d\n", read_transactions_count);
-
-    // Number of writing transactions is just however many transactions remain from the total
-    // int write_transactions_count = total_transactions - read_transactions_count;
-    // printf("Number of writing transactions: %d\n", write_transactions_count);
 
     // All but one thread are used for reading operations
     long reader_threads = thread_count - 1;
-
-    // One thread is used for writing operations
-    // long transfer_threads = 1;
-
-    // printf("Writers are: %ld, Readers are: %ld\n", transfer_threads, reader_threads);
 
     pthread_t *reader_handle = malloc(reader_threads * sizeof(pthread_t));
     pthread_t writer_handle;
 
     int transactions_per_read_thread = ceil(read_transactions_count / (double)reader_threads);
-    // printf("transactions_per_read_thread is: %d\n", transactions_per_read_thread);
 
     int transactions_per_transfer_thread = total_transactions - transactions_per_read_thread;
-    // printf("transactions_per_transfer_thread is: %d\n", transactions_per_transfer_thread);
 
     int remaining_reads = read_transactions_count;
 
@@ -257,7 +240,7 @@ int main(int argc, char *argv[]) {
         }
 
         args->list_of_accounts = &balance_list;
-        args->number_of_transfers = transactions_per_transfer_thread;
+        args->number_of_transfers = transactions_per_read_thread;
         args->thread_rank = thread;
 
         // printf("Creating read thread: %ld\n", thread);
