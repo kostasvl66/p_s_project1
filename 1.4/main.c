@@ -142,7 +142,7 @@ void *balance_read(void *arg) {
             mtxrw_lock(lock_type, "reader", &mutex, &rwlock);
         }
         balance_sum += list[bal];
-        sleep(1);
+        // sleep(1);
         if (!strcmp(lock_type, "MUTEX_FINEGRAINED") || !strcmp(lock_type, "RW_FINEGRAINED")) {
             mtxrw_unlock(lock_type, &mutex_list[bal], &rw_list[bal]);
         } else {
