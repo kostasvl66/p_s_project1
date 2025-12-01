@@ -34,4 +34,4 @@ clean-q3:
 	@rm -f $(PROGRAM_Q3)
 
 clean:
-	@rm -f $(PROGRAM_Q1) $(PROGRAM_Q2)
+	@rm -f $(PROGRAM_Q1) $(PROGRAM_Q2) $(PROGRAM_Q3)
