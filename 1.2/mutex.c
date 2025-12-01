@@ -49,6 +49,8 @@ int main(int argc, char *argv[]) {
 
     thread_count = strtol(argv[1], NULL, 10); // Receiving number of threads from command line
     increment_count = strtol(argv[2], NULL, 10);
+
+    // Allocating memory for thread data
     thread_handle = malloc(thread_count * sizeof(pthread_t)); // Allocating memory for thread data
 
     // Get the starting time of execution
@@ -81,6 +83,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_destroy(&mutex);
     fclose(fileptr);
 
+    // Printing value after all increments are finished
     printf("Final value of variable is: %ld\n", shared);
     printf("Time of execution is: %lf\n", execution_time);
     printf("----------Shutting down mutex----------\n\n");
