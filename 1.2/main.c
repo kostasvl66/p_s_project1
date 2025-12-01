@@ -34,12 +34,12 @@ int main(int argc, char *argv[]) {
         perror("File could not be opened");
     }
 
+    long shared = 0; // Shared variable to be incremented by the thread function
+    printf("Starting value of shared variable is: %ld\n", shared);
+
     // Receiving number of threads number of increments from command line
     thread_count = strtol(argv[1], NULL, 10);
     increment_count = strtol(argv[2], NULL, 10);
-
-    long shared = 0;
-    printf("Starting value of shared variable is: %ld\n", shared);
 
     // Allocating memory for thread data
     thread_handle = malloc(thread_count * sizeof(pthread_t));
