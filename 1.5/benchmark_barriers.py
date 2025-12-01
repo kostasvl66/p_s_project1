@@ -5,8 +5,8 @@ import sys
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-Ns = [100, 1000, 10000] # N's to try
-Ms = [2, 4, 8, 16] # number of threads to try
+Ns = [1000, 10000, 50000] # N's to try
+Ms = [2, 4, 8, 16, 32] # number of threads to try
 J = 4
 
 PROGRAMS = ["./barrier_q1", "./barrier_q2"]
